@@ -43,16 +43,30 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
   create table events (
     id uuid primary key default gen_random_uuid(),
     user_id uuid references auth.users not null,
-    type text not null,       -- 'fixed' | 'personal' | 'personal-time' | 'travel'
+    type text not null,       -- 'fixed' | 'personal' | 'personal-time' | 'travel' | 'small-group'
     title text not null,
     day integer not null,     -- 0=Sun … 6=Sat
     start_hour float not null,
     dur float not null,
     location text,
     client_id uuid references clients(id) on delete set null,
+    capacity integer,         -- used by 'small-group' events (defaults to 4)
     created_at timestamptz default now()
   );
   alter table events enable row level security;
   create policy "Users own their events" on events
+    for all using (auth.uid() = user_id);
+
+  -- Event members (roster for small-group sessions: up to `capacity` clients per event)
+  create table event_members (
+    id uuid primary key default gen_random_uuid(),
+    event_id uuid references events(id) on delete cascade not null,
+    client_id uuid references clients(id) on delete cascade not null,
+    user_id uuid references auth.users not null,
+    created_at timestamptz default now(),
+    unique (event_id, client_id)
+  );
+  alter table event_members enable row level security;
+  create policy "Users own their event members" on event_members
     for all using (auth.uid() = user_id);
   ────────────────────────────────────────────────────────────────────────── */

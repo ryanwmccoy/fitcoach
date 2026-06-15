@@ -54,8 +54,8 @@ export default function SuggestPage() {
         client_id: null,
       })
     }
-    await supabase.from('events').insert(rows)
-    setEvents(ev => [...ev, ...rows.map((r, i) => ({ ...r, id: `tmp-${Date.now()}-${i}` }))])
+    const { data } = await supabase.from('events').insert(rows).select()
+    setEvents(ev => [...ev, ...(data || [])])
     setBooking(null)
     setClientId('')
   }

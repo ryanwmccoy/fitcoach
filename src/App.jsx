@@ -12,6 +12,7 @@ function Shell() {
   const { user, loading } = useAuth()
   const [page, setPage]   = useState('calendar')
   const [addSession, setAddSession] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   if (loading) return <div className="loading" style={{ paddingTop: 80 }}>Loading…</div>
   if (!user)   return <AuthPage />
@@ -51,7 +52,7 @@ function Shell() {
 
       {/* Main content */}
       <div className="main">
-        {page === 'calendar' && <CalendarPage onAddSession={() => setAddSession(true)} />}
+        {page === 'calendar' && <CalendarPage onAddSession={() => setAddSession(true)} refreshKey={refreshKey} />}
         {page === 'clients'  && <ClientsPage />}
         {page === 'suggest'  && <SuggestPage />}
         {page === 'export'   && <ExportPage />}
@@ -71,7 +72,7 @@ function Shell() {
       {addSession && (
         <AddSessionModal
           onClose={() => setAddSession(false)}
-          onSaved={() => {}}
+          onSaved={() => setRefreshKey(k => k + 1)}
         />
       )}
     </div>

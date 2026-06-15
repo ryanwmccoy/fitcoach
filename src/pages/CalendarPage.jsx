@@ -1,25 +1,32 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { DAYS, HOURS, fmtH, fmtDate, getWeekDates } from '../lib/utils'
+import { DAYS, HOURS, TYPE_LABEL, TYPE_BADGE, SMALL_GROUP_CAPACITY, fmtH, fmtDate, getWeekDates } from '../lib/utils'
 import Modal from '../components/Modal'
+import SmallGroupModal from '../components/SmallGroupModal'
 
-export default function CalendarPage({ onAddSession }) {
+export default function CalendarPage({ onAddSession, refreshKey }) {
   const { user }    = useAuth()
-  const [events, setEvents]   = useState([])
-  const [weekOff, setWeekOff] = useState(0)
-  const [detail, setDetail]   = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [events, setEvents]     = useState([])
+  const [members, setMembers]   = useState([])   // event_members joined with client name
+  const [clients, setClients]   = useState([])
+  const [weekOff, setWeekOff]   = useState(0)
+  const [detail, setDetail]     = useState(null) // generic event detail
+  const [groupDetail, setGroupDetail] = useState(null) // small-group event
+  const [loading, setLoading]   = useState(true)
 
-  useEffect(() => { loadEvents() }, [user])
+  useEffect(() => { loadAll() }, [user, refreshKey])
 
-  async function loadEvents() {
+  async function loadAll() {
     setLoading(true)
-    const { data } = await supabase
-      .from('events')
-      .select('*')
-      .eq('user_id', user.id)
-    setEvents(data || [])
+    const [{ data: ev }, { data: mem }, { data: cl }] = await Promise.all([
+      supabase.from('events').select('*').eq('user_id', user.id),
+      supabase.from('event_members').select('id, event_id, client_id, clients(name)').eq('user_id', user.id),
+      supabase.from('clients').select('id, name').eq('user_id', user.id).eq('archived', false).order('name'),
+    ])
+    setEvents(ev || [])
+    setMembers((mem || []).map(m => ({ id: m.id, event_id: m.event_id, client_id: m.client_id, name: m.clients?.name || '—' })))
+    setClients(cl || [])
     setLoading(false)
   }
 
@@ -29,6 +36,8 @@ export default function CalendarPage({ onAddSession }) {
     setDetail(null)
   }
 
+  function refresh() { loadAll() }
+
   const dates = getWeekDates(weekOff)
   const today = new Date()
 
@@ -36,7 +45,22 @@ export default function CalendarPage({ onAddSession }) {
     if (type === 'fixed')         return 'cal-event ev-fixed'
     if (type === 'personal-time') return 'cal-event ev-personal-time'
     if (type === 'travel')        return 'cal-event ev-travel'
+    if (type === 'small-group')   return 'cal-event ev-small-group'
     return 'cal-event ev-personal'
+  }
+
+  function membersFor(eventId) {
+    return members.filter(m => m.event_id === eventId)
+  }
+
+  // small-group slots annotated with member counts (for the roster modal's "move" picker)
+  const groupSlots = events
+    .filter(e => e.type === 'small-group')
+    .map(e => ({ ...e, memberCount: membersFor(e.id).length }))
+
+  function openEvent(ev) {
+    if (ev.type === 'small-group') setGroupDetail(ev)
+    else setDetail(ev)
   }
 
   return (
@@ -81,17 +105,24 @@ export default function CalendarPage({ onAddSession }) {
                     )
                     return (
                       <div key={`c-${h}-${d}`} className="day-cell">
-                        {cellEvents.map(ev => (
-                          <div
-                            key={ev.id}
-                            className={evClass(ev.type)}
-                            style={{ height: ev.dur * 40 - 2 }}
-                            onClick={() => setDetail(ev)}
-                          >
-                            <div>{ev.title}</div>
-                            {ev.location && <div style={{ opacity: 0.75 }}>{ev.location}</div>}
-                          </div>
-                        ))}
+                        {cellEvents.map(ev => {
+                          const roster = ev.type === 'small-group' ? membersFor(ev.id) : []
+                          return (
+                            <div
+                              key={ev.id}
+                              className={evClass(ev.type)}
+                              style={{ height: ev.dur * 40 - 2 }}
+                              onClick={() => openEvent(ev)}
+                            >
+                              <div>{ev.title}</div>
+                              {ev.type === 'small-group' ? (
+                                <div style={{ opacity: 0.75 }}>{roster.length}/{ev.capacity || SMALL_GROUP_CAPACITY} filled</div>
+                              ) : ev.location && (
+                                <div style={{ opacity: 0.75 }}>{ev.location}</div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     )
                   })}
@@ -102,13 +133,12 @@ export default function CalendarPage({ onAddSession }) {
         )}
       </div>
 
+      {/* Generic event detail */}
       {detail && (
         <Modal onClose={() => setDetail(null)}>
           <h3>{detail.title}</h3>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-            <span className={`badge badge-${detail.type === 'fixed' ? 'purple' : detail.type === 'personal-time' ? 'coral' : detail.type === 'travel' ? 'amber' : 'teal'}`}>
-              {detail.type === 'fixed' ? 'Group class' : detail.type === 'personal-time' ? 'Personal time' : detail.type === 'travel' ? 'Travel' : 'Personal training'}
-            </span>
+            <span className={`badge ${TYPE_BADGE[detail.type]}`}>{TYPE_LABEL[detail.type]}</span>
             {detail.location && <span className="badge badge-amber">{detail.location}</span>}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text2)' }}>
@@ -123,6 +153,18 @@ export default function CalendarPage({ onAddSession }) {
             <button className="btn" onClick={() => setDetail(null)}>Close</button>
           </div>
         </Modal>
+      )}
+
+      {/* Small-group roster detail */}
+      {groupDetail && (
+        <SmallGroupModal
+          event={groupDetail}
+          members={membersFor(groupDetail.id)}
+          allClients={clients}
+          groupSlots={groupSlots}
+          onClose={() => setGroupDetail(null)}
+          onChange={refresh}
+        />
       )}
     </>
   )

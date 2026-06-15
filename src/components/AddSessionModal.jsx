@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { DAYS, HOURS, fmtH } from '../lib/utils'
+import { DAYS, HOURS, fmtH, SMALL_GROUP_CAPACITY } from '../lib/utils'
 import Modal from './Modal'
 
 export default function AddSessionModal({ onClose, onSaved }) {
   const { user }  = useAuth()
   const [clients, setClients]     = useState([])
   const [locations, setLocations] = useState([])
+  const [sessionType, setSessionType] = useState('personal') // 'personal' | 'small-group' | 'personal-time'
   const [form, setForm] = useState({
     client_id: '',
     day: 1,
@@ -15,13 +16,13 @@ export default function AddSessionModal({ onClose, onSaved }) {
     dur: 1,
     location: '',
     title: '',
-    type: 'personal',
   })
+  const [groupMembers, setGroupMembers] = useState([]) // client ids for small-group
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
     Promise.all([
-      supabase.from('clients').select('*').eq('user_id', user.id).eq('archived', false),
+      supabase.from('clients').select('*').eq('user_id', user.id).eq('archived', false).order('name'),
       supabase.from('locations').select('*').eq('user_id', user.id),
     ]).then(([{ data: cl }, { data: lo }]) => {
       setClients(cl || [])
@@ -30,18 +31,51 @@ export default function AddSessionModal({ onClose, onSaved }) {
     })
   }, [user])
 
+  function toggleMember(id) {
+    setGroupMembers(m => {
+      if (m.includes(id)) return m.filter(x => x !== id)
+      if (m.length >= SMALL_GROUP_CAPACITY) return m
+      return [...m, id]
+    })
+  }
+
   async function save() {
-    const cl = clients.find(c => c.id === form.client_id)
-    const isPersonalTime = !form.client_id
+    if (sessionType === 'small-group') {
+      const { data: ev, error } = await supabase.from('events').insert({
+        user_id: user.id,
+        type: 'small-group',
+        title: form.title || 'Small group',
+        day: Number(form.day),
+        start_hour: Number(form.start_hour),
+        dur: Number(form.dur),
+        location: form.location,
+        client_id: null,
+        capacity: SMALL_GROUP_CAPACITY,
+      }).select().single()
+      if (error) return
+      if (groupMembers.length) {
+        await supabase.from('event_members').insert(
+          groupMembers.map(client_id => ({ event_id: ev.id, client_id, user_id: user.id }))
+        )
+      }
+      onSaved(ev)
+      onClose()
+      return
+    }
+
+    const isPersonal = sessionType === 'personal'
+    const cl = isPersonal ? clients.find(c => c.id === form.client_id) : null
+    if (isPersonal && !cl) return
+
     const row = {
       user_id: user.id,
-      type: isPersonalTime ? 'personal-time' : 'personal',
-      title: isPersonalTime ? (form.title || 'Personal time') : cl.name,
+      type: isPersonal ? 'personal' : 'personal-time',
+      title: isPersonal ? cl.name : (form.title || 'Personal time'),
       day: Number(form.day),
       start_hour: Number(form.start_hour),
       dur: Number(form.dur),
       location: form.location,
-      client_id: form.client_id || null,
+      client_id: isPersonal ? form.client_id : null,
     }
     const { data, error } = await supabase.from('events').insert(row).select().single()
     if (!error) { onSaved(data); onClose() }
@@ -52,19 +86,58 @@ export default function AddSessionModal({ onClose, onSaved }) {
   return (
     <Modal onClose={onClose}>
       <h3>Add session</h3>
+
       <div className="field">
-        <label>Client (blank = personal time)</label>
-        <select value={form.client_id} onChange={e => set('client_id', e.target.value)}>
-          <option value="">Personal time</option>
-          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        <label>Session type</label>
+        <select value={sessionType} onChange={e => setSessionType(e.target.value)}>
+          <option value="personal">Personal training (1 client)</option>
+          <option value="small-group">Small group (up to {SMALL_GROUP_CAPACITY} clients)</option>
+          <option value="personal-time">Personal time / blocked</option>
         </select>
       </div>
-      {!form.client_id && (
+
+      {sessionType === 'personal' && (
+        <div className="field">
+          <label>Client</label>
+          <select value={form.client_id} onChange={e => set('client_id', e.target.value)}>
+            <option value="">— select —</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+      )}
+
+      {sessionType === 'small-group' && (
+        <>
+          <div className="field">
+            <label>Slot name</label>
+            <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Small Group — Strength" />
+          </div>
+          <div className="field">
+            <label>Roster ({groupMembers.length}/{SMALL_GROUP_CAPACITY}) — optional, can add later</label>
+            <div className="checkbox-list">
+              {clients.map(c => {
+                const checked = groupMembers.includes(c.id)
+                const disabled = !checked && groupMembers.length >= SMALL_GROUP_CAPACITY
+                return (
+                  <label key={c.id} className={`checkbox-row${disabled ? ' disabled' : ''}`}>
+                    <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggleMember(c.id)} />
+                    {c.name}
+                  </label>
+                )
+              })}
+              {!clients.length && <div style={{ padding: 10, fontSize: 12, color: 'var(--text3)' }}>No clients yet.</div>}
+            </div>
+          </div>
+        </>
+      )}
+
+      {sessionType === 'personal-time' && (
         <div className="field">
           <label>Label</label>
           <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Rest day, Admin, Gym…" />
         </div>
       )}
+
       <div className="field">
         <label>Day</label>
         <select value={form.day} onChange={e => set('day', e.target.value)}>
@@ -97,7 +170,10 @@ export default function AddSessionModal({ onClose, onSaved }) {
       </div>
       <div className="btn-row">
         <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" onClick={save}>Add</button>
+        <button className="btn btn-primary" onClick={save}
+          disabled={sessionType === 'personal' && !form.client_id}>
+          Add
+        </button>
       </div>
     </Modal>
   )

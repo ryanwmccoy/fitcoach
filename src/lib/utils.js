@@ -6,6 +6,24 @@ export const COLORS = ['teal','purple','coral','amber']
 export const COLOR_BG   = { teal:'#E1F5EE', purple:'#EEEDFE', coral:'#FAECE7', amber:'#FAEEDA' }
 export const COLOR_TEXT = { teal:'#085041', purple:'#3C3489', coral:'#712B13', amber:'#633806' }
 
+export const SMALL_GROUP_CAPACITY = 4
+
+export const TYPE_LABEL = {
+  fixed:           'Group class',
+  personal:        'Personal training',
+  'personal-time': 'Personal time',
+  travel:          'Travel',
+  'small-group':   'Small group',
+}
+
+export const TYPE_BADGE = {
+  fixed:           'badge-purple',
+  personal:        'badge-teal',
+  'personal-time': 'badge-coral',
+  travel:          'badge-amber',
+  'small-group':   'badge-pink',
+}
+
 export function fmtH(h) {
   const hh = Math.floor(h)
   const mm = h % 1 === 0.5 ? '30' : '00'
@@ -40,7 +58,7 @@ export function scoreSlot(h) {
   return score
 }
 
-// Find open slots for a client given existing events
+// Find open 1:1 slots for a client given existing events
 export function findSlots(events, locationTravelMin, dur) {
   const tb = (locationTravelMin || 0) / 60
   const slots = []

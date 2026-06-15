@@ -14,6 +14,9 @@
   --amber:       #BA7517;
   --amber-light: #FAEEDA;
   --amber-text:  #633806;
+  --pink:        #D4537E;
+  --pink-light:  #FBEAF0;
+  --pink-text:   #72243E;
   --gray-light:  #F1EFE8;
   --border:      rgba(0,0,0,0.12);
   --border-md:   rgba(0,0,0,0.22);
@@ -130,6 +133,7 @@ body {
 }
 .btn:hover    { background: var(--bg2); }
 .btn:active   { transform: scale(0.98); }
+.btn:disabled { opacity: 0.5; cursor: default; }
 .btn-primary  { background: var(--teal); color: #fff; border-color: var(--teal); }
 .btn-primary:hover { background: var(--teal-dark); }
 .btn-danger   { color: var(--coral); border-color: var(--coral); }
@@ -163,6 +167,25 @@ body {
   font-family: inherit;
 }
 .field textarea { resize: vertical; min-height: 60px; }
+
+.checkbox-list {
+  border: 0.5px solid var(--border-md);
+  border-radius: var(--radius-md);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-bottom: 0.5px solid var(--border);
+  cursor: pointer;
+}
+.checkbox-row:last-child { border-bottom: none; }
+.checkbox-row input { width: auto; }
+.checkbox-row.disabled { color: var(--text3); cursor: default; }
 
 /* ── Modal ── */
 .modal-overlay {
@@ -201,6 +224,7 @@ body {
 .badge-purple { background: var(--purple-light);  color: var(--purple-text); }
 .badge-coral  { background: var(--coral-light);   color: var(--coral-text); }
 .badge-amber  { background: var(--amber-light);   color: var(--amber-text); }
+.badge-pink   { background: var(--pink-light);    color: var(--pink-text); }
 .badge-gray   { background: var(--gray-light);    color: var(--text2); }
 
 /* ── Avatar ── */
@@ -279,6 +303,7 @@ body {
 .ev-personal      { background: var(--teal-light);   color: var(--teal-text);   border-left: 2px solid var(--teal); }
 .ev-travel        { background: var(--amber-light);  color: var(--amber-text);  border-left: 2px solid var(--amber); opacity: 0.85; }
 .ev-personal-time { background: var(--coral-light);  color: var(--coral-text);  border-left: 2px solid var(--coral); }
+.ev-small-group   { background: var(--pink-light);   color: var(--pink-text);   border-left: 2px solid var(--pink); }
 
 /* ── Slot finder ── */
 .slot-row {
@@ -343,6 +368,26 @@ body {
   font-size: 13px;
   color: var(--coral-text);
 }
+
+/* ── Roster (small group) ── */
+.roster-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.roster-row:last-child { border-bottom: none; }
+.roster-name { flex: 1; font-size: 13px; font-weight: 500; }
+.capacity-pill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--pink-light);
+  color: var(--pink-text);
+}
+.capacity-pill.full { background: var(--gray-light); color: var(--text2); }
 
 /* ── Loading ── */
 .loading { color: var(--text3); font-size: 13px; padding: 24px; text-align: center; }
