@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { DAYS, HOURS, fmtH, SMALL_GROUP_CAPACITY } from '../lib/utils'
+import { DAYS, HOURS, fmtH, SMALL_GROUP_CAPACITY, GROUP_SIZE_OPTIONS } from '../lib/utils'
 import Modal from './Modal'
 
 export default function AddSessionModal({ onClose, onSaved }) {
@@ -18,6 +18,7 @@ export default function AddSessionModal({ onClose, onSaved }) {
     title: '',
   })
   const [groupMembers, setGroupMembers] = useState([]) // client ids for small-group
+  const [groupCapacity, setGroupCapacity] = useState(SMALL_GROUP_CAPACITY)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
@@ -34,9 +35,14 @@ export default function AddSessionModal({ onClose, onSaved }) {
   function toggleMember(id) {
     setGroupMembers(m => {
       if (m.includes(id)) return m.filter(x => x !== id)
-      if (m.length >= SMALL_GROUP_CAPACITY) return m
+      if (m.length >= groupCapacity) return m
       return [...m, id]
     })
+  }
+
+  function changeGroupCapacity(newCap) {
+    setGroupCapacity(newCap)
+    setGroupMembers(m => m.slice(0, newCap))
   }
 
   async function save() {
@@ -50,7 +56,7 @@ export default function AddSessionModal({ onClose, onSaved }) {
         dur: Number(form.dur),
         location: form.location,
         client_id: null,
-        capacity: SMALL_GROUP_CAPACITY,
+        capacity: groupCapacity,
       }).select().single()
       if (error) return
       if (groupMembers.length) {
@@ -81,7 +87,7 @@ export default function AddSessionModal({ onClose, onSaved }) {
     if (!error) { onSaved(data); onClose() }
   }
 
-  const halfHours = HOURS.flatMap(h => [h, h + 0.5]).filter(h => h < 21)
+  const quarterHours = HOURS.flatMap(h => [h, h + 0.25, h + 0.5, h + 0.75]).filter(h => h < 21)
 
   return (
     <Modal onClose={onClose}>
@@ -91,7 +97,7 @@ export default function AddSessionModal({ onClose, onSaved }) {
         <label>Session type</label>
         <select value={sessionType} onChange={e => setSessionType(e.target.value)}>
           <option value="personal">Personal training (1 client)</option>
-          <option value="small-group">Small group (up to {SMALL_GROUP_CAPACITY} clients)</option>
+          <option value="small-group">Small group (4–6 clients)</option>
           <option value="personal-time">Personal time / blocked</option>
         </select>
       </div>
@@ -113,11 +119,17 @@ export default function AddSessionModal({ onClose, onSaved }) {
             <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Small Group — Strength" />
           </div>
           <div className="field">
-            <label>Roster ({groupMembers.length}/{SMALL_GROUP_CAPACITY}) — optional, can add later</label>
+            <label>Group size</label>
+            <select value={groupCapacity} onChange={e => changeGroupCapacity(Number(e.target.value))}>
+              {GROUP_SIZE_OPTIONS.map(n => <option key={n} value={n}>Up to {n}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>Roster ({groupMembers.length}/{groupCapacity}) — optional, can add later</label>
             <div className="checkbox-list">
               {clients.map(c => {
                 const checked = groupMembers.includes(c.id)
-                const disabled = !checked && groupMembers.length >= SMALL_GROUP_CAPACITY
+                const disabled = !checked && groupMembers.length >= groupCapacity
                 return (
                   <label key={c.id} className={`checkbox-row${disabled ? ' disabled' : ''}`}>
                     <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggleMember(c.id)} />
@@ -148,7 +160,7 @@ export default function AddSessionModal({ onClose, onSaved }) {
         <div className="field">
           <label>Start time</label>
           <select value={form.start_hour} onChange={e => set('start_hour', e.target.value)}>
-            {halfHours.map(h => <option key={h} value={h}>{fmtH(h)}</option>)}
+            {quarterHours.map(h => <option key={h} value={h}>{fmtH(h)}</option>)}
           </select>
         </div>
         <div className="field">

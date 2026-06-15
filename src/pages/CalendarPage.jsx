@@ -107,11 +107,12 @@ export default function CalendarPage({ onAddSession, refreshKey }) {
                       <div key={`c-${h}-${d}`} className="day-cell">
                         {cellEvents.map(ev => {
                           const roster = ev.type === 'small-group' ? membersFor(ev.id) : []
+                          const topOffset = (ev.start_hour % 1) * 40
                           return (
                             <div
                               key={ev.id}
                               className={evClass(ev.type)}
-                              style={{ height: ev.dur * 40 - 2 }}
+                              style={{ height: ev.dur * 40 - 2, top: topOffset }}
                               onClick={() => openEvent(ev)}
                             >
                               <div>{ev.title}</div>

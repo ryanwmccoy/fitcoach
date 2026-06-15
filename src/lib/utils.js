@@ -7,6 +7,7 @@ export const COLOR_BG   = { teal:'#E1F5EE', purple:'#EEEDFE', coral:'#FAECE7', a
 export const COLOR_TEXT = { teal:'#085041', purple:'#3C3489', coral:'#712B13', amber:'#633806' }
 
 export const SMALL_GROUP_CAPACITY = 4
+export const GROUP_SIZE_OPTIONS = [4, 6]
 
 export const TYPE_LABEL = {
   fixed:           'Group class',
@@ -26,7 +27,7 @@ export const TYPE_BADGE = {
 
 export function fmtH(h) {
   const hh = Math.floor(h)
-  const mm = h % 1 === 0.5 ? '30' : '00'
+  const mm = String(Math.round((h % 1) * 60)).padStart(2, '0')
   if (hh < 12) return `${hh}:${mm}am`
   if (hh === 12) return `12:${mm}pm`
   return `${hh - 12}:${mm}pm`
@@ -63,7 +64,7 @@ export function findSlots(events, locationTravelMin, dur) {
   const tb = (locationTravelMin || 0) / 60
   const slots = []
   for (let day = 1; day <= 5; day++) {
-    for (let h = 7; h <= 20 - dur; h += 0.5) {
+    for (let h = 7; h <= 20 - dur; h += 0.25) {
       const end = h + dur
       const bs = h - tb
       const be = end + tb
